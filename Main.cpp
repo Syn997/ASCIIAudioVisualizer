@@ -93,7 +93,12 @@ static void draw_visualizer(ULONGLONG ms)
 			if (level < 0.0f) level = 0.0f;
 			if (level > 1.0f) level = 1.0f;
 
-			int height = (int)(level * BAR_HEIGHT + 0.5f);
+
+			//calculate height of the bars based on constants
+			int height = (int)(audio_levels[col] * BAR_HEIGHT + 0.5f);
+
+			if (height > BAR_HEIGHT) height = BAR_HEIGHT;
+			if (height < 0) height = 0;
 
 			// Solid characters make the bar height visible.
 			putchar(height >= row ? '#' : ' ');
@@ -286,24 +291,21 @@ int main(void)
 					? (float)sqrt(sum / samples)
 					: 0.0f;
 
-				// Boost quiet sounds, then emphasize subtle changes.
-				float level = rms * 12.0f;
+				// Lower sensitivity
+				float level = rms * 4.0f;
 
+				// Keep quiet sounds visible, without amplifying everything into oblivion
+				level = sqrtf(level);
 				if (level > 1.0f)
 					level = 1.0f;
 
-				// Nonlinear curve: more visible movement at lower levels.
-				level = sqrtf(level);
-
-				// Smooth the display without hiding quick peaks.
+				// Smooth movement
 				static float smoothed_level = 0.0f;
 
 				if (level > smoothed_level)
-					smoothed_level = level * 0.75f
-					+ smoothed_level * 0.25f;
+					smoothed_level = smoothed_level * 0.65f + level * 0.35f;
 				else
-					smoothed_level = smoothed_level * 0.80f
-					+ level * 0.20f;
+					smoothed_level = smoothed_level * 0.90f + level * 0.10f;
 
 				level = smoothed_level;
 
