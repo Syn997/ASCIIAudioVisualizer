@@ -1,10 +1,11 @@
-#define WIN32_LEAN_AND_MEAN
+﻿#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <mmreg.h>
 #include <ksmedia.h>
 #include <stdio.h>
+#include <psapi.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h> // Required for C99 - C17
@@ -13,7 +14,104 @@
 #pragma comment(lib, "uuid.lib")
 
 #define BAR_COUNT  48
-#define BAR_HEIGHT 40
+#define BAR_HEIGHT 24
+
+#include <stdlib.h>
+#include <time.h>
+
+ULONGLONG start_time = GetTickCount64();
+
+void draw_stats(double elapsed_seconds, int bpm)
+{
+	PROCESS_MEMORY_COUNTERS pmc = {};
+	pmc.cb = sizeof(pmc);
+
+	SIZE_T memory_kb = 0;
+
+	if (GetProcessMemoryInfo(
+		GetCurrentProcess(), &pmc, sizeof(pmc)))
+	{
+		memory_kb = pmc.WorkingSetSize / 1024;
+	}
+
+	HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+	COORD pos = { 0, 0 };
+	SetConsoleCursorPosition(console, pos);
+
+	SetConsoleTextAttribute(
+		console,
+		FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+
+	printf("Elapsed: %02d:%02d:%02d\n",
+		(int)(elapsed_seconds / 3600),
+		((int)elapsed_seconds / 60) % 60,
+		(int)elapsed_seconds % 60);
+
+	printf("Memory:  %zu KB\n", (size_t)memory_kb);
+	printf("BPM:     %d\n", bpm);
+}
+
+volatile int current_bpm = 10;
+
+void update_bpm(float level)
+{
+	static float envelope = 0.0f;
+	static float previous_envelope = 0.0f;
+	static float noise_floor = 0.0f;
+
+	static ULONGLONG last_beat = 0;
+	static ULONGLONG last_candidate = 0;
+
+	ULONGLONG now = GetTickCount64();
+
+	// Track the changing audio level.
+	envelope = envelope * 0.7f + level * 0.3f;
+
+	// Adapt to the background level.
+	noise_floor = noise_floor * 0.995f + envelope * 0.005f;
+
+	// Detect a local rise through an adaptive threshold.
+	float threshold = noise_floor + 0.04f;
+
+	bool rising_peak =
+		envelope > threshold &&
+		previous_envelope <= threshold;
+
+	previous_envelope = envelope;
+
+	if (!rising_peak || now - last_candidate < 250)
+		return;
+
+	last_candidate = now;
+
+	if (last_beat != 0)
+	{
+		ULONGLONG interval = now - last_beat;
+
+		// Accept approximately 50-200 BPM.
+		if (interval >= 300 && interval <= 1200)
+		{
+			int detected_bpm =
+				(int)(60000.0 / interval + 0.5);
+
+			// Smooth the estimate.
+			if (current_bpm == 120)
+				current_bpm = detected_bpm;
+			else
+				current_bpm =
+				(current_bpm * 3 + detected_bpm) / 4;
+		}
+	}
+
+	last_beat = now;
+}
+
+const char* bar_chars = "░▒▓█@$%&*+=xX";
+
+void init_visualizer()
+{
+	srand((unsigned int)time(NULL));
+}
 
 static void setup_console(void)
 {
@@ -68,12 +166,12 @@ static WORD get_color(ULONGLONG ms)
 }
 
 //called by the renderer in main
-
-#define BAR_HEIGHT 24
-
 static void draw_visualizer(ULONGLONG ms)
 {
 	HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+	// Reserve rows 0-3 for stats.
+	COORD pos = { 0, 5 };
+	SetConsoleCursorPosition(console, pos);
 
 	if (console == INVALID_HANDLE_VALUE || console == NULL)
 		return;
@@ -101,7 +199,9 @@ static void draw_visualizer(ULONGLONG ms)
 			if (height < 0) height = 0;
 
 			// Solid characters make the bar height visible.
-			putchar(height >= row ? '#' : ' ');
+			//use random character from bar_chars instead of #
+			//putchar(bar_chars[rand() % 14]);
+			putchar(height >= row ? bar_chars[rand() % 14] : ' ');
 			putchar(' ');
 		}
 
@@ -114,8 +214,8 @@ static void draw_visualizer(ULONGLONG ms)
 		FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE
 	);
 
-	printf("\r\nElapsed: %llu ms", (unsigned long long)ms);
 
+	//printf("\r\nElapsed: %llu ms", (unsigned long long)ms);
 	// Erase remnants of the previous status line.
 	printf("                                      \n");
 	fflush(stdout);
@@ -149,6 +249,9 @@ static float read_sample(
 int main(void)
 {
 	setup_console();
+
+	init_visualizer();
+
 	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
 	if (FAILED(hr))
@@ -309,6 +412,9 @@ int main(void)
 
 				level = smoothed_level;
 
+				//update the bpm level
+				update_bpm(level);
+
 				// Shift history and append the new level.
 				for (int i = 0; i < BAR_COUNT - 1; ++i)
 					audio_levels[i] = audio_levels[i + 1];
@@ -333,7 +439,17 @@ int main(void)
 				}
 			}
 
+
+
 			draw_visualizer(GetTickCount64() - start);
+
+			//draw todo
+			draw_stats(
+				(GetTickCount64() - start_time) / 1000.0,
+				current_bpm
+			);
+
+
 			Sleep(10);
 
 			if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
