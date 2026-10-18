@@ -1,55 +1,42 @@
-# Prerequisites
-*.d
 
-# Object files
+# Compiled binaries
 *.o
-*.ko
 *.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
 *.exe
 *.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.tlog
+*.log
+*.ipch
+DocumentLayout.json
+*.json
+.vs
+
+
+# Build directories
+build/
+cmake-build-*/
 
 # Debug files
-*.dSYM/
-*.su
-*.idb
 *.pdb
+*.ilk
+*.dSYM/
+Debug/
+*.vs/
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# IDE settings
+.vscode/
+.idea/
+*.suo
+*.user
 
-# debug information files
-*.dwo
+# OS files
+.DS_Store
+Thumbs.db
+.vs/RFPSLimiter.slnx/v18/Browse.VC.db
+.vs/RFPSLimiter.slnx/FileContentIndex/29c81830-b7f6-4a58-8274-cc980e3b955c.vsidx
+/.vs/RFPSLimiter.slnx
