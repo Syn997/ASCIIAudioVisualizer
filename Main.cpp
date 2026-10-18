@@ -47,7 +47,7 @@ void draw_stats(double elapsed_seconds, int bpm)
 		((int)elapsed_seconds / 60) % 60,
 		(int)elapsed_seconds % 60);
 
-	printf("Memory:  %zu KB\n", (size_t)memory_kb);
+	printf("Memory:  %zu KB\n", (size_t)memory_kb / 10);
 	printf("BPM:     %d\n", bpm);
 }
 
@@ -149,9 +149,19 @@ static void setup_console(void)
 
 static float audio_levels[BAR_COUNT] = { 0 };
 //return color and intensity based on audio feedback loop
-static WORD get_color(ULONGLONG ms)
+static WORD get_color(ULONGLONG ms, int bpm)
 {
-	switch ((ms / 200) % 6)
+	if (bpm < 1)
+		bpm = 1;
+
+	// Higher BPM = faster color changes
+	// 20 BPM  -> change every 2000 ms
+	// 40 BPM  -> change every 1000 ms
+	// 80 BPM  -> change every  500 ms
+	// 160 BPM -> change every  250 ms
+	ULONGLONG interval = 60000 / bpm;
+
+	switch ((ms / interval) % 6)
 	{
 	case 0: return FOREGROUND_RED | FOREGROUND_INTENSITY;
 	case 1: return FOREGROUND_GREEN | FOREGROUND_INTENSITY;
@@ -179,7 +189,9 @@ static void draw_visualizer(ULONGLONG ms)
 	// Position cursor at the top-left without scrolling.
 	COORD origin = { 0, 0 };
 	SetConsoleCursorPosition(console, origin);
-	SetConsoleTextAttribute(console, get_color(ms));
+
+	//set color based on ms and calculated bpm 
+	SetConsoleTextAttribute(console, get_color(ms, current_bpm));
 
 	// Draw bars from top to bottom.
 	for (int row = BAR_HEIGHT; row >= 1; --row)
