@@ -51,7 +51,7 @@ void draw_stats(double elapsed_seconds, int bpm)
 	printf("BPM:     %d\n", bpm);
 }
 
-volatile int current_bpm = 10;
+volatile int current_bpm = 100;
 
 void update_bpm(float level)
 {
@@ -98,8 +98,7 @@ void update_bpm(float level)
 			if (current_bpm == 120)
 				current_bpm = detected_bpm;
 			else
-				current_bpm =
-				(current_bpm * 3 + detected_bpm) / 4;
+				current_bpm = (((current_bpm * 3 + detected_bpm) / 4));
 		}
 	}
 
@@ -401,26 +400,30 @@ int main(void)
 						if (a > peak) peak = a;
 					}
 				}
-
 				float rms = samples > 0
 					? (float)sqrt(sum / samples)
 					: 0.0f;
 
-				// Lower sensitivity
-				float level = rms * 4.0f;
+				// Sensitivity
+				float level = rms * 4.5f;
 
-				// Keep quiet sounds visible, without amplifying everything into oblivion
-				level = sqrtf(level);
+				// Compress the dynamic range without boosting quiet noise as much
 				if (level > 1.0f)
 					level = 1.0f;
 
-				// Smooth movement
+				// Fast attack, controlled decay
 				static float smoothed_level = 0.0f;
 
 				if (level > smoothed_level)
-					smoothed_level = smoothed_level * 0.65f + level * 0.35f;
+				{
+					// Snap toward sudden peaks
+					smoothed_level = smoothed_level * 0.20f + level * 0.80f;
+				}
 				else
-					smoothed_level = smoothed_level * 0.90f + level * 0.10f;
+				{
+					// Fall away more gradually
+					smoothed_level = smoothed_level * 0.82f + level * 0.18f;
+				}
 
 				level = smoothed_level;
 
