@@ -1,5 +1,4 @@
-﻿#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+﻿#include <windows.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <mmreg.h>
@@ -9,15 +8,20 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h> // Required for C99 - C17
+#include <stdlib.h>
+#include <time.h>
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
 
+#define WIN32_LEAN_AND_MEAN
 #define BAR_COUNT  48
 #define BAR_HEIGHT 24
 
-#include <stdlib.h>
-#include <time.h>
+
+static float hp_prev_input = 0.0f;
+static float hp_prev_output = 0.0f;
+static float treble_smoothed = 0.0f;
 
 ULONGLONG start_time = GetTickCount64();
 
@@ -252,6 +256,7 @@ static float read_sample(
 		return sample;
 	}
 
+
 	int16_t sample;
 	memcpy(&sample, data + index * sizeof(int16_t), sizeof(int16_t));
 	return (float)sample / 32768.0f;
@@ -400,6 +405,43 @@ int main(void)
 						if (a > peak) peak = a;
 					}
 				}
+
+
+				float treble_sum = 0.0f;
+
+				const float alpha = 0.75f; // High-pass filter strength
+
+				for (int i = 0; i < samples; ++i)
+				{
+					float x = audio_levels[i]; // Replace with your actual sample array
+
+					float y = alpha * (hp_prev_output + x - hp_prev_input);
+
+					hp_prev_input = x;
+					hp_prev_output = y;
+
+					treble_sum += y * y;
+				}
+
+				float treble_rms = samples > 0
+					? sqrtf(treble_sum / samples)
+					: 0.0f;
+
+				float treble_level = treble_rms * 8.0f;
+
+				if (treble_level > 1.0f)
+					treble_level = 1.0f;
+
+				// Fast attack, quick decay for crisp high-frequency spikes
+				if (treble_level > treble_smoothed)
+					treble_smoothed = treble_smoothed * 0.15f
+					+ treble_level * 0.85f;
+				else
+					treble_smoothed = treble_smoothed * 0.65f
+					+ treble_level * 0.35f;
+
+				treble_level = treble_smoothed;
+
 				float rms = samples > 0
 					? (float)sqrt(sum / samples)
 					: 0.0f;
