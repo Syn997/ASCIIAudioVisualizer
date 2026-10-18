@@ -8,10 +8,85 @@
 #define BAR_COUNT  32
 #define BAR_HEIGHT 12
 
+void draw_visualizer(void)
+{
+	static ULONGLONG start = 0;
 
+	if (start == 0)
+		start = GetTickCount64();
+
+	ULONGLONG ms = GetTickCount64() - start;
+
+	// Change color every 200 milliseconds.
+	WORD color = (WORD)(FOREGROUND_RED |
+		FOREGROUND_INTENSITY);
+
+	switch ((ms / 200) % 6)
+	{
+	case 0: color = FOREGROUND_RED |
+		FOREGROUND_INTENSITY; break;
+	case 1: color = FOREGROUND_GREEN |
+		FOREGROUND_INTENSITY; break;
+	case 2: color = FOREGROUND_BLUE |
+		FOREGROUND_INTENSITY; break;
+	case 3: color = FOREGROUND_RED |
+		FOREGROUND_GREEN |
+		FOREGROUND_INTENSITY; break;
+	case 4: color = FOREGROUND_RED |
+		FOREGROUND_BLUE |
+		FOREGROUND_INTENSITY; break;
+	case 5: color = FOREGROUND_GREEN |
+		FOREGROUND_BLUE |
+		FOREGROUND_INTENSITY; break;
+	}
+
+	HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	if (console == INVALID_HANDLE_VALUE ||
+		console == NULL)
+		return;
+
+	SetConsoleTextAttribute(console, color);
+
+	COORD origin = { 0, 0 };
+	SetConsoleCursorPosition(console, origin);
+
+	for (int row = BAR_HEIGHT; row > 0; --row)
+	{
+		for (int col = 0; col < BAR_COUNT; ++col)
+		{
+			// Simple deterministic animation.
+			int phase = (int)((ms / 80 + col * 3) % 12);
+			int height = phase;
+
+			putchar(height >= row ? '#' : ' ');
+			putchar(' ');
+		}
+
+		putchar('\n');
+	}
+
+	SetConsoleTextAttribute(console,
+		FOREGROUND_RED | FOREGROUND_GREEN |
+		FOREGROUND_BLUE);
+
+	printf("\r\nElapsed: %llu ms\n",
+		(unsigned long long)ms);
+
+	fflush(stdout);
+}
 
 int main(void)
 {
+	// Disable console QuickEdit mode
+	HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
+	DWORD mode;
+
+	GetConsoleMode(hInput, &mode);
+	mode &= ~ENABLE_QUICK_EDIT_MODE;
+	mode |= ENABLE_EXTENDED_FLAGS;
+	SetConsoleMode(hInput, mode);
+
 	HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
 
 	DWORD written;
@@ -21,8 +96,7 @@ int main(void)
 
 	while (1)
 	{
-		printf("test");
-		//draw_visualizer();
+		draw_visualizer();
 		Sleep(30);
 	}
 
